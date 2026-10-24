@@ -7,10 +7,10 @@ module top #(
     input wire clk, input wire rst, input wire rx, output wire tx
 );
     wire baud_tick;
-    wire [7:0] rx_data, rx_fifo_data, tx_fifo_data, tx_data;
+    wire [7:0] rx_data, rx_fifo_data, tx_fifo_data, tx_fifo_data_out;
     wire rx_done, tx_done, rx_full, rx_empty, tx_full, tx_empty;
     wire rx_fifo_wr_en, rx_fifo_rd_en, tx_fifo_wr_en, tx_fifo_rd_en;
-    wire tx_start, tx_busy;
+    wire tx_start;
     reg tx_start_reg;
     reg [7:0] tx_byte_reg;
 
@@ -30,20 +30,22 @@ module top #(
     fifo #(.DEPTH(FIFO_DEPTH),.DATA_WIDTH(8)) u_tx_fifo
         (.clk(clk),.rst(rst),.wr_en(tx_fifo_wr_en),.rd_en(tx_fifo_rd_en),
          .data_in(tx_fifo_data),.data_out(tx_fifo_data_out),.full(tx_full),.empty(tx_empty));
-    wire [7:0] tx_fifo_data_out;
+
+    localparam [1:0] T_IDLE=0,T_POP=1,T_LAUNCH=2,T_SEND=3;
     reg [1:0] tx_state;
-    localparam [1:0] T_IDLE=0,T_LOAD=1,T_SEND=2;
-    assign tx_fifo_rd_en = (tx_state==T_LOAD) && !tx_empty;
+    assign tx_fifo_rd_en = (tx_state==T_POP) && !tx_empty;
     assign tx_start = tx_start_reg;
     uart_tx #(.CLK_FREQ(CLK_FREQ),.BAUD_RATE(BAUD_RATE)) u_tx
         (.clk(clk),.rst(rst),.tx_data(tx_byte_reg),.tx_start(tx_start),.tx(tx),.tx_done(tx_done));
+
     always @(posedge clk) begin
         if(rst) begin tx_state<=T_IDLE; tx_start_reg<=0; tx_byte_reg<=0; end
         else begin
             tx_start_reg<=0;
             case(tx_state)
-                T_IDLE: if(!tx_empty) tx_state<=T_LOAD;
-                T_LOAD: if(!tx_empty) begin tx_byte_reg<=tx_fifo_data_out; tx_start_reg<=1; tx_state<=T_SEND; end
+                T_IDLE: if(!tx_empty) tx_state<=T_POP;
+                T_POP: if(!tx_empty) tx_state<=T_LAUNCH;
+                T_LAUNCH: begin tx_byte_reg<=tx_fifo_data_out; tx_start_reg<=1; tx_state<=T_SEND; end
                 T_SEND: if(tx_done) tx_state<=T_IDLE;
                 default: tx_state<=T_IDLE;
             endcase
