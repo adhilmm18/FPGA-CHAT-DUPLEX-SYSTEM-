@@ -166,13 +166,8 @@ Planned work:
 - Hardware interface learning platforms
 - Real-time digital communication demos
 
-## Team
 
 | Name |
-|---|
-| Siddharth |
-| Aravind |
-| Aldrin |
 | Adhil |
 
 ## License
